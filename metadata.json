@@ -1,0 +1,8 @@
+{
+  "name": "iRepair Mobiles UK - Express Repairs & Refurbished Store",
+  "description": "Replica of irepair-mobiles.co.uk featuring express mobile phone and laptop repair booking, refurbished device shop, store locations, and real-time repair tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

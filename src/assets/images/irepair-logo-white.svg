@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 144" width="520" height="144" fill="none">
+  <!-- 1. CROSSED TOOLS ICON (Left Graphic in Pure White) -->
+  <g transform="translate(74, 72)">
+    <!-- Screwdriver (Top-Left to Bottom-Right, 45 deg) -->
+    <g transform="rotate(45)">
+      <!-- Shaft and Flat Blade Tip -->
+      <path fill="#FFFFFF" d="M -8 -4.5 L 36 -4.5 L 43 -2.5 L 51 -2 L 51 2 L 43 2.5 L 36 4.5 L -8 4.5 Z" />
+      <!-- Handle Collar and Grip Contour -->
+      <path fill="#FFFFFF" d="M -8 -6.5 L -14 -6.5 L -17 -8.5 L -49 -8.5 C -54 -8.5 -57 -4.5 -57 0 C -57 4.5 -54 8.5 -49 8.5 L -17 8.5 L -14 6.5 L -8 6.5 Z" />
+      <!-- Handle Indentations -->
+      <rect x="-31" y="-8.5" width="3.5" height="17" fill="#020617" fill-opacity="0.35" rx="0.5" />
+      <rect x="-41" y="-8.5" width="3.5" height="17" fill="#020617" fill-opacity="0.35" rx="0.5" />
+    </g>
+
+    <!-- Wrench (Bottom-Left to Top-Right, -45 deg) -->
+    <g transform="rotate(-45)">
+      <!-- Shaft -->
+      <rect fill="#FFFFFF" x="-32" y="-5.5" width="65" height="11" rx="1.5" />
+      <!-- Open-Ended Crescent Jaw (Top-Right) -->
+      <path fill="#FFFFFF" fill-rule="evenodd" d="M 27 -5.5 C 28 -11 31.5 -17 39.5 -19.5 C 46.5 -22 53.5 -18 56.5 -12.5 C 57.5 -9.5 56.5 -6.5 53.5 -4.5 L 43.5 -1 L 43.5 1 L 53.5 4.5 C 56.5 6.5 57.5 9.5 56.5 12.5 C 53.5 18 46.5 22 39.5 19.5 C 31.5 17 28 11 27 5.5 Z" />
+      <!-- Closed Box / Ring End (Bottom-Left) -->
+      <path fill="#FFFFFF" fill-rule="evenodd" d="M -32 0 C -32 -10.5 -39.5 -18 -49 -18 C -58.5 -18 -66 -10.5 -66 0 C -66 10.5 -58.5 18 -49 18 C -39.5 18 -32 10.5 -32 0 Z M -49 -7.5 C -44.8 -7.5 -41.5 -4.2 -41.5 0 C -41.5 4.2 -44.8 7.5 -49 7.5 C -53.2 7.5 -56.5 4.2 -56.5 0 C -56.5 -4.2 -53.2 -7.5 -49 -7.5 Z" />
+    </g>
+  </g>
+
+  <!-- 2. VECTOR LOGOTYPE (Pure Graphic Paths in Pure White - No Text Element) -->
+  <g fill="#FFFFFF">
+    <!-- Letter 'i' -->
+    <!-- Dot -->
+    <circle cx="162" cy="40" r="8" />
+    <!-- Stem -->
+    <rect x="154" y="55" width="16" height="47" rx="1.5" />
+
+    <!-- Letter 'R' -->
+    <path fill-rule="evenodd" d="
+      M 184 34 
+      L 223 34 
+      C 238 34 247 41 247 52 
+      C 247 62 239 68 227 70 
+      L 248 102 
+      L 230 102 
+      L 211 72 
+      L 200 72 
+      L 200 102 
+      L 184 102 
+      Z 
+      M 200 47 
+      L 200 60 
+      L 220 60 
+      C 227 60 231 57 231 53.5 
+      C 231 50 227 47 220 47 
+      Z" 
+    />
+
+    <!-- Letter 'e' -->
+    <path fill-rule="evenodd" d="
+      M 280 54 
+      C 264 54 252 65 252 79 
+      C 252 93 264 103 281 103 
+      C 292 103 301 98 306 91 
+      L 294 83 
+      C 291 87 286 90 280 90 
+      C 272 90 268 85 267 79 
+      L 308 79 
+      C 308 78 308 76 308 74 
+      C 308 62 297 54 280 54 
+      Z 
+      M 268 70 
+      C 270 65 274 62 280 62 
+      C 286 62 291 65 292 70 
+      Z" 
+    />
+
+    <!-- Letter 'p' -->
+    <path fill-rule="evenodd" d="
+      M 318 55 
+      L 333 55 
+      L 333 60 
+      C 336 56 341 54 348 54 
+      C 361 54 372 65 372 79 
+      C 372 93 361 103 347 103 
+      C 341 103 336 100 333 96 
+      L 333 124 
+      L 318 124 
+      Z 
+      M 333 79 
+      C 333 86 338 90 344 90 
+      C 351 90 357 85 357 79 
+      C 357 72 351 67 344 67 
+      C 338 67 333 71 333 79 
+      Z" 
+    />
+
+    <!-- Letter 'a' (Single-Storey Geometric) -->
+    <path fill-rule="evenodd" d="
+      M 401 54 
+      C 388 54 378 64 378 79 
+      C 378 93 388 103 401 103 
+      C 408 103 413 100 416 96 
+      L 416 102 
+      L 430 102 
+      L 430 55 
+      L 416 55 
+      L 416 61 
+      C 413 57 408 54 401 54 
+      Z 
+      M 404 67 
+      C 397 67 392 72 392 79 
+      C 392 85 397 90 404 90 
+      C 410 90 416 85 416 79 
+      C 416 72 410 67 404 67 
+      Z" 
+    />
+
+    <!-- Letter 'i' -->
+    <!-- Dot -->
+    <circle cx="448" cy="40" r="8" />
+    <!-- Stem -->
+    <rect x="440" y="55" width="16" height="47" rx="1.5" />
+
+    <!-- Letter 'r' -->
+    <path d="
+      M 466 55 
+      L 481 55 
+      L 481 64 
+      C 485 57 491 54 498 54 
+      C 502 54 505 55 507 56 
+      L 502 69 
+      C 499 68 497 68 494 68 
+      C 488 68 482 72 481 80 
+      L 481 102 
+      L 466 102 
+      Z" 
+    />
+  </g>
+</svg>
