@@ -25,7 +25,8 @@ export const ShopView: React.FC = () => {
     products,
     categories,
     setShowWpSyncModal,
-    wpSyncStatus
+    wpSyncStatus,
+    showNotification
   } = useApp();
 
   // Filters state
@@ -205,7 +206,7 @@ export const ShopView: React.FC = () => {
             </div>
           </div>
 
-          {/* Category Filter - Dynamically populated from WordPress categories */}
+          {/* Category Filter - Dynamically populated from WordPress categories, excluding 0 product categories */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-semibold text-slate-700">Category</label>
@@ -229,22 +230,30 @@ export const ShopView: React.FC = () => {
                 <span>All Products</span>
                 <span className="text-[10px] text-slate-400 font-bold">{products.length}</span>
               </button>
-              {categories.map(cat => (
-                <button
-                  key={cat.slug}
-                  onClick={() => setSelectedCategory(cat.slug)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors flex items-center justify-between cursor-pointer ${
-                    selectedCategory.toLowerCase() === cat.slug.toLowerCase() 
-                      ? 'bg-pink-50 text-[#DF0C88] font-semibold' 
-                      : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="capitalize">{cat.name}</span>
-                  {typeof cat.count === 'number' && (
-                    <span className="text-[10px] text-slate-400 font-bold">{cat.count}</span>
-                  )}
-                </button>
-              ))}
+              {categories
+                .map(cat => {
+                  const matchingCount = products.filter(p => 
+                    p.category?.toLowerCase() === cat.slug?.toLowerCase() ||
+                    p.category?.toLowerCase() === cat.name?.toLowerCase()
+                  ).length;
+                  const displayCount = matchingCount > 0 ? matchingCount : (cat.count ?? 0);
+                  return { ...cat, displayCount };
+                })
+                .filter(cat => cat.displayCount > 0)
+                .map(cat => (
+                  <button
+                    key={cat.slug}
+                    onClick={() => setSelectedCategory(cat.slug)}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                      selectedCategory.toLowerCase() === cat.slug.toLowerCase() 
+                        ? 'bg-pink-50 text-[#DF0C88] font-semibold' 
+                        : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="capitalize">{cat.name}</span>
+                    <span className="text-[10px] text-slate-400 font-bold">{cat.displayCount}</span>
+                  </button>
+                ))}
             </div>
           </div>
 
@@ -353,81 +362,113 @@ export const ShopView: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProducts.map((product) => (
-                <div 
-                  key={product.id}
-                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg transition-all flex flex-col justify-between group"
-                >
+              {filteredProducts.map((product) => {
+                const isVariable = product.type === 'variable' || (product.variations && product.variations.length > 0);
+                const displayPriceRange = product.priceRange || (product.minPrice && product.maxPrice && product.minPrice !== product.maxPrice 
+                  ? `£${product.minPrice.toFixed(2)} – £${product.maxPrice.toFixed(2)}` 
+                  : `£${product.price.toFixed(2)}`);
+
+                return (
                   <div 
-                    className="cursor-pointer"
-                    onClick={() => viewProductDetail(product)}
+                    key={product.id}
+                    className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg transition-all flex flex-col justify-between group"
                   >
-                    <div className="relative aspect-4/3 bg-slate-50 overflow-hidden">
-                      <img 
-                        src={product.image} 
-                        alt={product.title}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                      />
-                      <div className="absolute top-2.5 left-2.5 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-semibold px-2 py-0.5 rounded">
-                        {product.condition}
-                      </div>
-                      {product.regularPrice && (
-                        <div className="absolute top-2.5 right-2.5 bg-[#DF0C88] text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                          Save £{(product.regularPrice - product.price).toFixed(0)}
+                    <div 
+                      className="cursor-pointer"
+                      onClick={() => viewProductDetail(product)}
+                    >
+                      <div className="relative aspect-4/3 bg-slate-50 overflow-hidden">
+                        <img 
+                          src={product.image} 
+                          alt={product.title}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                        />
+                        <div className="absolute top-2.5 left-2.5 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-semibold px-2 py-0.5 rounded">
+                          {product.condition}
                         </div>
-                      )}
-                    </div>
-
-                    <div className="p-4 space-y-2">
-                      <div className="text-[11px] font-semibold text-[#DF0C88] uppercase tracking-wider">
-                        {product.brand}
-                      </div>
-                      <h3 className="text-sm font-bold text-slate-900 line-clamp-2 group-hover:text-[#DF0C88] transition-colors">
-                        {product.title}
-                      </h3>
-
-                      <div className="flex items-center gap-1 text-xs text-amber-500">
-                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                        <span className="font-semibold text-slate-700">{product.rating}</span>
-                        <span className="text-slate-400">({product.reviewsCount})</span>
-                      </div>
-
-                      <div className="pt-2 flex items-baseline gap-2">
-                        <span className="text-lg font-extrabold text-slate-900 tabular-nums">
-                          £{product.price.toFixed(2)}
-                        </span>
-                        {product.regularPrice && (
-                          <span className="text-xs text-slate-400 line-through tabular-nums">
-                            £{product.regularPrice.toFixed(2)}
-                          </span>
+                        {isVariable ? (
+                          <div className="absolute top-2.5 right-2.5 bg-slate-900/90 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-xs">
+                            Multiple Options
+                          </div>
+                        ) : product.regularPrice && (
+                          <div className="absolute top-2.5 right-2.5 bg-[#DF0C88] text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                            Save £{(product.regularPrice - product.price).toFixed(0)}
+                          </div>
                         )}
                       </div>
 
-                      <div className="text-[11px] text-emerald-700 font-medium">
-                        ✓ In Stock · {product.warrantyMonths} Months Warranty
-                      </div>
-
-                      {product.yoastSeo && (
-                        <div className="flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 w-fit">
-                          <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
-                          <span>Yoast SEO</span>
+                      <div className="p-4 space-y-2">
+                        <div className="text-[11px] font-semibold text-[#DF0C88] uppercase tracking-wider">
+                          {product.brand}
                         </div>
+                        <h3 className="text-sm font-bold text-slate-900 line-clamp-2 group-hover:text-[#DF0C88] transition-colors">
+                          {product.title}
+                        </h3>
+
+                        <div className="flex items-center gap-1 text-xs text-amber-500">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                          <span className="font-semibold text-slate-700">{product.rating}</span>
+                          <span className="text-slate-400">({product.reviewsCount})</span>
+                        </div>
+
+                        <div className="pt-2 flex items-baseline gap-2 flex-wrap">
+                          {isVariable ? (
+                            <span className="text-base font-black text-slate-900 tabular-nums">
+                              {displayPriceRange}
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-lg font-extrabold text-slate-900 tabular-nums">
+                                £{product.price.toFixed(2)}
+                              </span>
+                              {product.regularPrice && (
+                                <span className="text-xs text-slate-400 line-through tabular-nums">
+                                  £{product.regularPrice.toFixed(2)}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        <div className="text-[11px] text-emerald-700 font-medium">
+                          ✓ In Stock · {product.warrantyMonths} Months Warranty
+                        </div>
+
+                        {product.yoastSeo && (
+                          <div className="flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 w-fit">
+                            <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
+                            <span>Yoast SEO</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-4 pt-0">
+                      {isVariable ? (
+                        <button 
+                          onClick={() => viewProductDetail(product)}
+                          className="w-full bg-[#DF0C88] hover:bg-[#C50875] text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+                        >
+                          <SlidersHorizontal className="w-3.5 h-3.5" />
+                          <span>Select options</span>
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => {
+                            addToCart(product);
+                            showNotification(`Added ${product.title} to cart!`, 'success');
+                          }}
+                          className="w-full bg-slate-900 hover:bg-[#DF0C88] text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5" />
+                          <span>Add to Cart</span>
+                        </button>
                       )}
                     </div>
                   </div>
-
-                  <div className="p-4 pt-0">
-                    <button 
-                      onClick={() => addToCart(product)}
-                      className="w-full bg-slate-900 hover:bg-[#DF0C88] text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-1.5 active:scale-[0.98]"
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                      <span>Add to Cart</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

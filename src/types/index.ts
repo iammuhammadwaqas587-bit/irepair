@@ -117,6 +117,29 @@ export interface WordPressConfig {
   lastSyncedAt?: string;
 }
 
+export interface WooCommerceAttribute {
+  id?: number;
+  name: string;
+  slug?: string;
+  position?: number;
+  visible?: boolean;
+  variation?: boolean;
+  options: string[];
+}
+
+export interface ProductVariation {
+  id: number;
+  price: number;
+  regularPrice?: number;
+  salePrice?: number;
+  attributes: Record<string, string>;
+  rawAttributes?: { id?: number; name: string; slug?: string; option: string }[];
+  image?: string;
+  inStock: boolean;
+  stockQuantity?: number | null;
+  sku?: string;
+}
+
 export interface Product {
   id: string;
   title: string;
@@ -134,6 +157,8 @@ export interface Product {
   image: string;
   gallery?: string[];
   description: string;
+  shortDescription?: string;
+  longDescription?: string;
   specifications: Record<string, string>;
   warrantyMonths: number;
   variants?: {
@@ -143,6 +168,14 @@ export interface Product {
   wpId?: number;
   permalink?: string;
   yoastSeo?: YoastSeoData;
+  type?: 'simple' | 'variable';
+  priceHtml?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  priceRange?: string;
+  attributes?: WooCommerceAttribute[];
+  defaultAttributes?: Record<string, string>;
+  variations?: ProductVariation[];
 }
 
 export interface CartItem {
@@ -150,6 +183,9 @@ export interface CartItem {
   quantity: number;
   selectedColor?: string;
   selectedStorage?: string;
+  selectedVariationId?: number;
+  selectedAttributes?: Record<string, string>;
+  unitPrice?: number;
 }
 
 export interface Testimonial {

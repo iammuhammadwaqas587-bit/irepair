@@ -107,8 +107,8 @@ export const CartDrawer: React.FC = () => {
                           {item.product.title}
                         </h4>
                         <button 
-                          onClick={() => removeFromCart(item.product.id)}
-                          className="text-slate-400 hover:text-[#DF0C88] transition-colors p-1"
+                          onClick={() => removeFromCart(index)}
+                          className="text-slate-400 hover:text-[#DF0C88] transition-colors p-1 cursor-pointer"
                           title="Remove item"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -127,6 +127,14 @@ export const CartDrawer: React.FC = () => {
                             {item.selectedColor}
                           </span>
                         )}
+                        {item.selectedAttributes && Object.entries(item.selectedAttributes).map(([k, v]) => {
+                          if (k.toLowerCase() === 'storage' || k.toLowerCase() === 'color' || k.toLowerCase() === 'colour') return null;
+                          return (
+                            <span key={k} className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-medium">
+                              {v}
+                            </span>
+                          );
+                        })}
                         <span className="text-slate-400">·</span>
                         <span className="text-emerald-700 font-medium">
                           {item.product.warrantyMonths}M Warranty
@@ -138,8 +146,8 @@ export const CartDrawer: React.FC = () => {
                       {/* Quantity stepper */}
                       <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
                         <button 
-                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                          className="px-2 py-1 text-slate-600 hover:bg-slate-200"
+                          onClick={() => updateQuantity(index, item.quantity - 1)}
+                          className="px-2 py-1 text-slate-600 hover:bg-slate-200 cursor-pointer"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
@@ -147,15 +155,15 @@ export const CartDrawer: React.FC = () => {
                           {item.quantity}
                         </span>
                         <button 
-                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                          className="px-2 py-1 text-slate-600 hover:bg-slate-200"
+                          onClick={() => updateQuantity(index, item.quantity + 1)}
+                          className="px-2 py-1 text-slate-600 hover:bg-slate-200 cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
 
                       <div className="text-sm font-bold text-slate-900 tabular-nums">
-                        £{(item.product.price * item.quantity).toFixed(2)}
+                        £{((item.unitPrice ?? item.product.price) * item.quantity).toFixed(2)}
                       </div>
                     </div>
                   </div>

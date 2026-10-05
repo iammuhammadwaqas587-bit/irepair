@@ -46,9 +46,17 @@ interface AppContextType {
   
   // Cart
   cart: CartItem[];
-  addToCart: (product: Product, quantity?: number, color?: string, storage?: string) => void;
-  removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addToCart: (
+    product: Product, 
+    quantity?: number, 
+    color?: string, 
+    storage?: string,
+    variationId?: number,
+    attributes?: Record<string, string>,
+    unitPrice?: number
+  ) => void;
+  removeFromCart: (indexOrProductId: string | number) => void;
+  updateQuantity: (indexOrProductId: string | number, quantity: number) => void;
   clearCart: () => void;
   cartSubtotal: number;
   cartCount: number;
@@ -197,40 +205,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [wpConfig]);
 
-  const addToCart = (product: Product, quantity = 1, color?: string, storage?: string) => {
+  const addToCart = (
+    product: Product, 
+    quantity = 1, 
+    color?: string, 
+    storage?: string,
+    variationId?: number,
+    attributes?: Record<string, string>,
+    unitPrice?: number
+  ) => {
+    const finalPrice = unitPrice !== undefined ? unitPrice : product.price;
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id && item.selectedStorage === storage && item.selectedColor === color);
-      if (existing) {
-        return prev.map(item =>
-          item.product.id === product.id && item.selectedStorage === storage && item.selectedColor === color
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
+      const matchIndex = prev.findIndex(item => 
+        item.product.id === product.id && 
+        item.selectedVariationId === variationId &&
+        item.selectedStorage === storage && 
+        item.selectedColor === color
+      );
+      if (matchIndex >= 0) {
+        const copy = [...prev];
+        copy[matchIndex] = {
+          ...copy[matchIndex],
+          quantity: copy[matchIndex].quantity + quantity,
+          unitPrice: finalPrice,
+          selectedAttributes: attributes || copy[matchIndex].selectedAttributes
+        };
+        return copy;
       }
-      return [...prev, { product, quantity, selectedColor: color, selectedStorage: storage }];
+      return [
+        ...prev, 
+        { 
+          product, 
+          quantity, 
+          selectedColor: color, 
+          selectedStorage: storage,
+          selectedVariationId: variationId,
+          selectedAttributes: attributes,
+          unitPrice: finalPrice
+        }
+      ];
     });
     showNotification(`Added "${product.title}" to cart!`);
     setIsCartDrawerOpen(true);
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
+  const removeFromCart = (indexOrProductId: string | number) => {
+    if (typeof indexOrProductId === 'number') {
+      setCart(prev => prev.filter((_, idx) => idx !== indexOrProductId));
+    } else {
+      setCart(prev => prev.filter(item => item.product.id !== indexOrProductId));
+    }
     showNotification('Item removed from cart', 'info');
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (indexOrProductId: string | number, quantity: number) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(indexOrProductId);
       return;
     }
-    setCart(prev => prev.map(item => item.product.id === productId ? { ...item, quantity } : item));
+    if (typeof indexOrProductId === 'number') {
+      setCart(prev => prev.map((item, idx) => idx === indexOrProductId ? { ...item, quantity } : item));
+    } else {
+      setCart(prev => prev.map(item => item.product.id === indexOrProductId ? { ...item, quantity } : item));
+    }
   };
 
   const clearCart = () => {
     setCart([]);
   };
 
-  const cartSubtotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const cartSubtotal = cart.reduce((sum, item) => sum + ((item.unitPrice ?? item.product.price) * item.quantity), 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const viewProductDetail = (product: Product) => {

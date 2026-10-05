@@ -1,5 +1,8 @@
-import { Product, WordPressCategory, WordPressConfig, ProductCondition, YoastSeoData } from '../types';
+import { Product, WordPressCategory, WordPressConfig, ProductCondition, YoastSeoData, ProductVariation, WooCommerceAttribute } from '../types';
 import { LIVE_WP_PRODUCTS, LIVE_WP_CATEGORIES } from '../data/liveWordPressCatalog';
+import bundledVariationsRaw from '../data/bundledVariations.json';
+
+const bundledVariations = bundledVariationsRaw as Record<string, ProductVariation[]>;
 
 const WP_CONFIG_STORAGE_KEY = 'irepair_wp_config_v1';
 const WP_PRODUCTS_STORAGE_KEY = 'irepair_wp_products_v1';
@@ -180,6 +183,64 @@ export function parseYoastSeo(wpProduct: any): YoastSeoData | undefined {
   };
 }
 
+// Helper to parse price ranges from WooCommerce price_html
+export function parseWooPriceRange(priceHtml: string | undefined, basePrice: number): {
+  priceRange?: string;
+  minPrice: number;
+  maxPrice: number;
+  parsedRegularPrice?: number;
+} {
+  let minPrice = basePrice || 0;
+  let maxPrice = basePrice || 0;
+  let parsedRegularPrice: number | undefined;
+
+  if (!priceHtml) {
+    return {
+      priceRange: minPrice > 0 ? `£${minPrice.toFixed(2)}` : undefined,
+      minPrice,
+      maxPrice,
+    };
+  }
+
+  const clean = priceHtml
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&pound;/g, '£')
+    .replace(/&#8211;/g, '–')
+    .replace(/&ndash;/g, '–')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Pattern: £209.00 – £269.00
+  const rangeMatch = clean.match(/£\s*(\d+(?:\.\d+)?)\s*–\s*£\s*(\d+(?:\.\d+)?)/);
+  if (rangeMatch) {
+    minPrice = parseFloat(rangeMatch[1]);
+    maxPrice = parseFloat(rangeMatch[2]);
+    return {
+      priceRange: `£${minPrice.toFixed(2)} – £${maxPrice.toFixed(2)}`,
+      minPrice,
+      maxPrice,
+    };
+  }
+
+  // Original price was / Current price is
+  const origMatch = clean.match(/Original price was:\s*£\s*(\d+(?:\.\d+)?)/i);
+  if (origMatch) {
+    parsedRegularPrice = parseFloat(origMatch[1]);
+  }
+  const currMatch = clean.match(/Current price is:\s*£\s*(\d+(?:\.\d+)?)/i) || clean.match(/£\s*(\d+(?:\.\d+)?)/);
+  if (currMatch) {
+    minPrice = parseFloat(currMatch[1]);
+    maxPrice = minPrice;
+  }
+
+  return {
+    priceRange: minPrice > 0 ? `£${minPrice.toFixed(2)}` : undefined,
+    minPrice,
+    maxPrice,
+    parsedRegularPrice,
+  };
+}
+
 // Normalise WooCommerce product into frontend Product model
 export function normalizeWooCommerceProduct(wp: any): Product {
   const meta = wp.meta_data || [];
@@ -229,26 +290,73 @@ export function normalizeWooCommerceProduct(wp: any): Product {
   const images = (wp.images || []).map((img: any) => img.src).filter(Boolean);
   const defaultImage = images[0] || 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?auto=format&fit=crop&q=80&w=800';
 
+  // Check if variable
+  const isVariable = wp.type === 'variable' || (Array.isArray(wp.variations) && wp.variations.length > 0);
+
   // Parse price
-  const price = parseFloat(wp.price || wp.regular_price || '0') || 0;
-  const regularPrice = wp.regular_price && parseFloat(wp.regular_price) > price ? parseFloat(wp.regular_price) : undefined;
+  const basePrice = parseFloat(wp.price || wp.regular_price || '0') || 0;
+  const parsedPriceData = parseWooPriceRange(wp.price_html, basePrice);
+  let finalPrice = parsedPriceData.minPrice || basePrice;
+  let regularPrice = wp.regular_price && parseFloat(wp.regular_price) > finalPrice 
+    ? parseFloat(wp.regular_price) 
+    : (parsedPriceData.parsedRegularPrice && parsedPriceData.parsedRegularPrice > finalPrice ? parsedPriceData.parsedRegularPrice : undefined);
+
+  // Extract attributes
+  const attributes: WooCommerceAttribute[] = Array.isArray(wp.attributes)
+    ? wp.attributes.map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        slug: a.slug || a.name?.toLowerCase(),
+        position: a.position,
+        visible: a.visible !== false,
+        variation: Boolean(a.variation),
+        options: Array.isArray(a.options) ? a.options : [],
+      }))
+    : [];
+
+  // Extract default attributes
+  const defaultAttributes: Record<string, string> = {};
+  if (Array.isArray(wp.default_attributes)) {
+    wp.default_attributes.forEach((def: any) => {
+      if (def.name && def.option) {
+        defaultAttributes[def.name.toLowerCase().trim()] = def.option;
+      }
+    });
+  }
+
+  // Check bundled or cached variations
+  let variations: ProductVariation[] | undefined = wp.wpId && bundledVariations[wp.wpId]
+    ? bundledVariations[wp.wpId]
+    : (bundledVariations[wp.id] || undefined);
+
+  if (variations && variations.length > 0) {
+    const validPrices = variations.map(v => v.price).filter(p => p > 0);
+    if (validPrices.length > 0) {
+      const vMin = Math.min(...validPrices);
+      const vMax = Math.max(...validPrices);
+      finalPrice = vMin;
+      if (vMin !== vMax) {
+        parsedPriceData.priceRange = `£${vMin.toFixed(2)} – £${vMax.toFixed(2)}`;
+        parsedPriceData.minPrice = vMin;
+        parsedPriceData.maxPrice = vMax;
+      }
+    }
+  }
 
   // Extract storage variants if available in attributes
   let storageVariants: string[] = [];
   let colorVariants: { name: string; hex: string }[] = [];
 
-  if (Array.isArray(wp.attributes)) {
-    const storageAttr = wp.attributes.find((a: any) => a.name?.toLowerCase().includes('storage') || a.name?.toLowerCase().includes('capacity'));
-    if (storageAttr && Array.isArray(storageAttr.options)) {
-      storageVariants = storageAttr.options;
-    }
-    const colorAttr = wp.attributes.find((a: any) => a.name?.toLowerCase().includes('color') || a.name?.toLowerCase().includes('colour'));
-    if (colorAttr && Array.isArray(colorAttr.options)) {
-      colorVariants = colorAttr.options.map((opt: string) => ({
-        name: opt,
-        hex: opt.toLowerCase().includes('black') ? '#0f172a' : opt.toLowerCase().includes('white') ? '#f8fafc' : '#DF0C88',
-      }));
-    }
+  const storageAttr = attributes.find(a => a.name?.toLowerCase().includes('storage') || a.name?.toLowerCase().includes('capacity'));
+  if (storageAttr && Array.isArray(storageAttr.options)) {
+    storageVariants = storageAttr.options;
+  }
+  const colorAttr = attributes.find(a => a.name?.toLowerCase().includes('color') || a.name?.toLowerCase().includes('colour'));
+  if (colorAttr && Array.isArray(colorAttr.options)) {
+    colorVariants = colorAttr.options.map(opt => ({
+      name: opt,
+      hex: opt.toLowerCase().includes('black') ? '#0f172a' : opt.toLowerCase().includes('white') ? '#f8fafc' : '#DF0C88',
+    }));
   }
 
   // Specifications
@@ -280,8 +388,16 @@ export function normalizeWooCommerceProduct(wp: any): Product {
     slug: wp.slug || `product-${wp.id}`,
     category: categorySlug,
     brand,
-    price,
+    price: finalPrice,
     regularPrice,
+    type: isVariable ? 'variable' : 'simple',
+    priceHtml: wp.price_html,
+    priceRange: parsedPriceData.priceRange,
+    minPrice: parsedPriceData.minPrice,
+    maxPrice: parsedPriceData.maxPrice,
+    attributes: attributes.length > 0 ? attributes : undefined,
+    defaultAttributes: Object.keys(defaultAttributes).length > 0 ? defaultAttributes : undefined,
+    variations,
     condition,
     inStock: wp.stock_status === 'instock',
     stockCount: typeof wp.stock_quantity === 'number' ? wp.stock_quantity : (wp.stock_status === 'instock' ? 12 : 0),
@@ -291,6 +407,8 @@ export function normalizeWooCommerceProduct(wp: any): Product {
     image: defaultImage,
     gallery: images.length > 1 ? images.slice(1) : undefined,
     description: stripHtml(wp.short_description) || stripHtml(wp.description) || 'Premium device verified by iRepair UK technicians.',
+    shortDescription: stripHtml(wp.short_description) || stripHtml(wp.description) || '',
+    longDescription: wp.description || wp.short_description || '',
     specifications: specs,
     warrantyMonths: warrantyText.includes('6') ? 6 : 12,
     permalink: wp.permalink,
@@ -300,6 +418,71 @@ export function normalizeWooCommerceProduct(wp: any): Product {
     } : undefined,
     yoastSeo: parseYoastSeo(wp),
   };
+}
+
+// Fetch Variations for a Variable Product
+export async function fetchProductVariations(productId: number, config: WordPressConfig): Promise<ProductVariation[]> {
+  // Check local cache
+  try {
+    const raw = localStorage.getItem(`irepair_vars_${productId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+
+  // Check bundled data
+  if (bundledVariations[productId]) {
+    return bundledVariations[productId];
+  }
+
+  try {
+    const url = buildWooCommerceUrl(config.baseUrl, `products/${productId}/variations?per_page=50`, config);
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
+
+    if (!response.ok) {
+      console.warn(`Could not fetch variations for ${productId}: HTTP ${response.status}`);
+      return [];
+    }
+
+    const rawVars = await response.json();
+    if (!Array.isArray(rawVars)) return [];
+
+    const variations: ProductVariation[] = rawVars.map((v: any) => {
+      const attrMap: Record<string, string> = {};
+      (v.attributes || []).forEach((a: any) => {
+        const key = (a.name || a.slug || '').toLowerCase().trim();
+        attrMap[key] = a.option;
+      });
+
+      return {
+        id: v.id,
+        price: parseFloat(v.price || '0'),
+        regularPrice: v.regular_price ? parseFloat(v.regular_price) : undefined,
+        salePrice: v.sale_price ? parseFloat(v.sale_price) : undefined,
+        attributes: attrMap,
+        rawAttributes: v.attributes,
+        image: v.image?.src,
+        inStock: v.stock_status === 'instock',
+        stockQuantity: v.stock_quantity,
+        sku: v.sku,
+      };
+    });
+
+    try {
+      localStorage.setItem(`irepair_vars_${productId}`, JSON.stringify(variations));
+    } catch {}
+
+    return variations;
+  } catch (err) {
+    console.error(`Failed to fetch variations for ${productId}:`, err);
+    return [];
+  }
 }
 
 // Fetch Categories from WooCommerce

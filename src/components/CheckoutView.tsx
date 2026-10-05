@@ -133,7 +133,7 @@ export const CheckoutView: React.FC = () => {
                 <span className="text-slate-400 ml-2">x{it.quantity}</span>
               </div>
               <span className="font-bold text-slate-900 tabular-nums">
-                £{(it.product.price * it.quantity).toFixed(2)}
+                £{((it.unitPrice ?? it.product.price) * it.quantity).toFixed(2)}
               </span>
             </div>
           ))}
@@ -459,7 +459,7 @@ export const CheckoutView: React.FC = () => {
                   </div>
                 </div>
                 <div className="font-bold text-white tabular-nums">
-                  £{(item.product.price * item.quantity).toFixed(2)}
+                  £{((item.unitPrice ?? item.product.price) * item.quantity).toFixed(2)}
                 </div>
               </div>
             ))}
