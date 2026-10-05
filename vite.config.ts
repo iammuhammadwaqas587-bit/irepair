@@ -17,6 +17,14 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      proxy: {
+        '/api/wp': {
+          target: 'https://irepair-mobiles.co.uk',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/wp/, ''),
+          secure: false,
+        },
+      },
     },
   };
 });

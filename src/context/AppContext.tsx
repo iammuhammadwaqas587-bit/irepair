@@ -124,12 +124,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [showWpSyncModal, setShowWpSyncModal] = useState(false);
   
-  const [cart, setCart] = useState<CartItem[]>([
-    {
-      product: PRODUCTS[4], // MagSafe 20W Fast Charger
-      quantity: 1,
-    }
-  ]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    const initialProd = getStoredWpProducts()?.[1] || PRODUCTS[0];
+    return [
+      {
+        product: initialProd,
+        quantity: 1,
+      }
+    ];
+  });
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(products[0] || PRODUCTS[0]);
   const [shopBrandFilter, setShopBrandFilter] = useState<string>('all');

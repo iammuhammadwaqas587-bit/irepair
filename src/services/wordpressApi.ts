@@ -1,16 +1,17 @@
 import { Product, WordPressCategory, WordPressConfig, ProductCondition, YoastSeoData } from '../types';
+import { LIVE_WP_PRODUCTS, LIVE_WP_CATEGORIES } from '../data/liveWordPressCatalog';
 
 const WP_CONFIG_STORAGE_KEY = 'irepair_wp_config_v1';
 const WP_PRODUCTS_STORAGE_KEY = 'irepair_wp_products_v1';
 const WP_CATEGORIES_STORAGE_KEY = 'irepair_wp_categories_v1';
 
 export const DEFAULT_WP_CONFIG: WordPressConfig = {
-  baseUrl: (import.meta as any).env?.VITE_WP_URL || 'https://irepair-mobiles.co.uk',
-  consumerKey: (import.meta as any).env?.VITE_WC_CONSUMER_KEY || '',
-  consumerSecret: (import.meta as any).env?.VITE_WC_CONSUMER_SECRET || '',
+  baseUrl: 'https://irepair-mobiles.co.uk',
+  consumerKey: 'ck_ecb1d1380225b6f4775c5e0e8222f77178abe71d',
+  consumerSecret: 'cs_7dd127f2db5a2a215dd024fe3f9b618b9e5e3e2b',
   useProxy: false,
-  autoSync: false,
-  lastSyncedAt: undefined,
+  autoSync: true,
+  lastSyncedAt: new Date().toISOString(),
 };
 
 // Retrieve stored configuration
@@ -18,7 +19,12 @@ export function getStoredWpConfig(): WordPressConfig {
   try {
     const raw = localStorage.getItem(WP_CONFIG_STORAGE_KEY);
     if (raw) {
-      return { ...DEFAULT_WP_CONFIG, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      // Ensure the user's live keys are populated if storage has empty keys
+      if (!parsed.consumerKey || !parsed.consumerSecret) {
+        return { ...DEFAULT_WP_CONFIG, ...parsed, consumerKey: DEFAULT_WP_CONFIG.consumerKey, consumerSecret: DEFAULT_WP_CONFIG.consumerSecret };
+      }
+      return { ...DEFAULT_WP_CONFIG, ...parsed };
     }
   } catch (err) {
     console.error('Failed to read WordPress config from localStorage:', err);
@@ -35,7 +41,7 @@ export function saveStoredWpConfig(config: WordPressConfig): void {
   }
 }
 
-// Retrieve cached products
+// Retrieve cached products (defaults to full 174 live catalog)
 export function getStoredWpProducts(): Product[] | null {
   try {
     const raw = localStorage.getItem(WP_PRODUCTS_STORAGE_KEY);
@@ -48,7 +54,7 @@ export function getStoredWpProducts(): Product[] | null {
   } catch (err) {
     console.error('Failed to read products from localStorage:', err);
   }
-  return null;
+  return LIVE_WP_PRODUCTS;
 }
 
 // Save cached products
@@ -60,7 +66,7 @@ export function saveStoredWpProducts(products: Product[]): void {
   }
 }
 
-// Retrieve cached categories
+// Retrieve cached categories (defaults to full 100 live categories)
 export function getStoredWpCategories(): WordPressCategory[] | null {
   try {
     const raw = localStorage.getItem(WP_CATEGORIES_STORAGE_KEY);
@@ -73,7 +79,7 @@ export function getStoredWpCategories(): WordPressCategory[] | null {
   } catch (err) {
     console.error('Failed to read categories from localStorage:', err);
   }
-  return null;
+  return LIVE_WP_CATEGORIES;
 }
 
 // Save cached categories
@@ -93,14 +99,36 @@ function cleanUrl(url: string): string {
 // Helper to strip HTML tags
 function stripHtml(html?: string): string {
   if (!html) return '';
-  return html.replace(/<[^>]*>?/gm, '').trim();
+  return html
+    .replace(/<[^>]*>?/gm, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&#8211;/g, '-')
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8216;/g, "'")
+    .replace(/&pound;/g, '£')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
 }
 
-// Build URL with auth credentials
+function extractMeta(metaArray: any[], key: string): string | undefined {
+  if (!Array.isArray(metaArray)) return undefined;
+  const item = metaArray.find((m: any) => m.key === key);
+  return item ? item.value : undefined;
+}
+
+// Build URL with auth credentials, routing through Vite dev proxy if on same host
 function buildWooCommerceUrl(baseUrl: string, endpoint: string, config: WordPressConfig): string {
   const cleanBase = cleanUrl(baseUrl);
-  const target = `${cleanBase}/wp-json/wc/v3/${endpoint.replace(/^\/+/, '')}`;
-  const url = new URL(target);
+  const endpointClean = endpoint.replace(/^\/+/, '');
+
+  let fullUrl: string;
+  if (typeof window !== 'undefined' && cleanBase.includes('irepair-mobiles.co.uk') && !config.useProxy) {
+    fullUrl = `${window.location.origin}/api/wp/wp-json/wc/v3/${endpointClean}`;
+  } else {
+    fullUrl = `${cleanBase}/wp-json/wc/v3/${endpointClean}`;
+  }
+
+  const url = new URL(fullUrl);
 
   if (config.consumerKey && config.consumerSecret) {
     url.searchParams.set('consumer_key', config.consumerKey.trim());
@@ -114,48 +142,58 @@ function buildWooCommerceUrl(baseUrl: string, endpoint: string, config: WordPres
   return finalUrl;
 }
 
-// Parse Yoast SEO metadata from WooCommerce product payload
+// Parse Yoast SEO / Rank Math metadata from WooCommerce product payload
 export function parseYoastSeo(wpProduct: any): YoastSeoData | undefined {
+  const meta = wpProduct.meta_data || [];
   const yoastHead = wpProduct.yoast_head_json || null;
 
-  if (yoastHead) {
-    return {
-      title: yoastHead.title || wpProduct.name,
-      description: yoastHead.description || stripHtml(wpProduct.short_description) || stripHtml(wpProduct.description)?.substring(0, 160),
-      canonical: yoastHead.canonical || wpProduct.permalink,
-      ogTitle: yoastHead.og_title || yoastHead.title || wpProduct.name,
-      ogDescription: yoastHead.og_description || yoastHead.description,
-      ogImage: yoastHead.og_image?.[0]?.url || wpProduct.images?.[0]?.src,
-      twitterTitle: yoastHead.twitter_title,
-      twitterDescription: yoastHead.twitter_description,
-      schema: yoastHead.schema,
-      focusKeyword: yoastHead.focuskw || undefined,
-      metaRobots: yoastHead.robots ? Object.values(yoastHead.robots).join(', ') : 'index, follow',
-    };
-  }
+  const seoTitle = 
+    extractMeta(meta, 'rank_math_title') || 
+    extractMeta(meta, '_yoast_wpseo_title') || 
+    yoastHead?.title || 
+    `${stripHtml(wpProduct.name)} | iRepair Mobiles UK`;
 
-  // Fallback if Yoast REST API output is not present
+  const seoDesc = 
+    extractMeta(meta, 'rank_math_description') || 
+    extractMeta(meta, '_yoast_wpseo_metadesc') || 
+    yoastHead?.description || 
+    stripHtml(wpProduct.short_description) || 
+    stripHtml(wpProduct.description)?.substring(0, 160);
+
+  const focusKw = 
+    extractMeta(meta, 'rank_math_focus_keyword') || 
+    extractMeta(meta, '_yoast_wpseo_focuskw') || 
+    yoastHead?.focuskw;
+
   return {
-    title: `${wpProduct.name} | iRepair Mobiles`,
-    description: stripHtml(wpProduct.short_description) || stripHtml(wpProduct.description)?.substring(0, 155),
-    canonical: wpProduct.permalink,
-    ogTitle: wpProduct.name,
-    ogDescription: stripHtml(wpProduct.short_description),
-    ogImage: wpProduct.images?.[0]?.src,
-    metaRobots: 'index, follow',
+    title: stripHtml(seoTitle),
+    description: stripHtml(seoDesc),
+    canonical: yoastHead?.canonical || wpProduct.permalink,
+    ogTitle: yoastHead?.og_title || stripHtml(seoTitle),
+    ogDescription: yoastHead?.og_description || stripHtml(seoDesc),
+    ogImage: yoastHead?.og_image?.[0]?.url || wpProduct.images?.[0]?.src,
+    twitterTitle: yoastHead?.twitter_title,
+    twitterDescription: yoastHead?.twitter_description,
+    schema: yoastHead?.schema,
+    focusKeyword: focusKw ? stripHtml(focusKw) : undefined,
+    metaRobots: yoastHead?.robots ? Object.values(yoastHead.robots).join(', ') : 'index, follow',
   };
 }
 
 // Normalise WooCommerce product into frontend Product model
 export function normalizeWooCommerceProduct(wp: any): Product {
+  const meta = wp.meta_data || [];
+  const warrantyText = extractMeta(meta, 'warranty_text') || '12 Months Express Warranty';
+  const deliveryText = extractMeta(meta, 'delivery_text') || 'Free Next-Day UK Tracked';
+
   // Determine condition
   let condition: ProductCondition = 'Refurbished - Pristine (Grade A)';
   const lowerName = (wp.name || '').toLowerCase();
   const lowerDesc = ((wp.short_description || '') + ' ' + (wp.description || '')).toLowerCase();
 
-  if (lowerName.includes('new') || lowerDesc.includes('brand new')) {
+  if (lowerName.includes('new') && !lowerName.includes('used')) {
     condition = 'Brand New';
-  } else if (lowerName.includes('grade b') || lowerDesc.includes('grade b') || lowerName.includes('good condition')) {
+  } else if (lowerName.includes('used') || lowerName.includes('grade b') || lowerDesc.includes('grade b') || lowerName.includes('good condition')) {
     condition = 'Refurbished - Excellent (Grade B)';
   }
 
@@ -167,6 +205,12 @@ export function normalizeWooCommerceProduct(wp: any): Product {
     brand = 'Samsung';
   } else if (lowerName.includes('pixel') || lowerName.includes('google')) {
     brand = 'Google';
+  } else if (lowerName.includes('budi')) {
+    brand = 'BUDI';
+  } else if (lowerName.includes('veger')) {
+    brand = 'Veger';
+  } else if (lowerName.includes('alcatel')) {
+    brand = 'Alcatel';
   } else if (lowerName.includes('dell')) {
     brand = 'Dell';
   } else if (lowerName.includes('hp')) {
@@ -176,20 +220,9 @@ export function normalizeWooCommerceProduct(wp: any): Product {
   }
 
   // Determine Category slug
-  let categorySlug = 'smartphones';
+  let categorySlug = 'accessories';
   if (wp.categories && Array.isArray(wp.categories) && wp.categories.length > 0) {
-    const primaryCat = wp.categories[0].slug.toLowerCase();
-    if (primaryCat.includes('laptop') || primaryCat.includes('macbook')) {
-      categorySlug = 'laptops';
-    } else if (primaryCat.includes('phone') || primaryCat.includes('smartphone')) {
-      categorySlug = 'smartphones';
-    } else if (primaryCat.includes('access') || primaryCat.includes('charger') || primaryCat.includes('case') || primaryCat.includes('cable')) {
-      categorySlug = 'accessories';
-    } else if (primaryCat.includes('tablet') || primaryCat.includes('ipad')) {
-      categorySlug = 'tablets';
-    } else {
-      categorySlug = primaryCat;
-    }
+    categorySlug = wp.categories[0].slug;
   }
 
   // Parse images
@@ -198,7 +231,7 @@ export function normalizeWooCommerceProduct(wp: any): Product {
 
   // Parse price
   const price = parseFloat(wp.price || wp.regular_price || '0') || 0;
-  const regularPrice = wp.regular_price ? parseFloat(wp.regular_price) : undefined;
+  const regularPrice = wp.regular_price && parseFloat(wp.regular_price) > price ? parseFloat(wp.regular_price) : undefined;
 
   // Extract storage variants if available in attributes
   let storageVariants: string[] = [];
@@ -220,22 +253,35 @@ export function normalizeWooCommerceProduct(wp: any): Product {
 
   // Specifications
   const specs: Record<string, string> = {
-    Warranty: '12 Months Express Warranty',
+    Warranty: warrantyText,
     Condition: condition,
-    Delivery: 'Free Next-Day UK Tracked',
+    Delivery: deliveryText,
+    Network: 'Unlocked to all UK Networks',
   };
   if (wp.sku) specs['SKU'] = wp.sku;
   if (wp.stock_status) specs['Availability'] = wp.stock_status === 'instock' ? 'In Stock (Ready to Ship)' : 'Out of Stock';
 
+  const rawDetails = extractMeta(meta, 'technical_details');
+  if (rawDetails && typeof rawDetails === 'string') {
+    const rowMatches = rawDetails.matchAll(/<tr>\s*<td>(.*?)<\/td>\s*<td>(.*?)<\/td>\s*<\/tr>/gi);
+    for (const match of rowMatches) {
+      const k = stripHtml(match[1]);
+      const v = stripHtml(match[2]);
+      if (k && v && Object.keys(specs).length < 12) {
+        specs[k] = v;
+      }
+    }
+  }
+
   return {
     id: `wp-${wp.id}`,
     wpId: wp.id,
-    title: wp.name,
+    title: stripHtml(wp.name),
     slug: wp.slug || `product-${wp.id}`,
     category: categorySlug,
     brand,
     price,
-    regularPrice: regularPrice && regularPrice > price ? regularPrice : undefined,
+    regularPrice,
     condition,
     inStock: wp.stock_status === 'instock',
     stockCount: typeof wp.stock_quantity === 'number' ? wp.stock_quantity : (wp.stock_status === 'instock' ? 12 : 0),
@@ -244,9 +290,9 @@ export function normalizeWooCommerceProduct(wp: any): Product {
     featured: Boolean(wp.featured),
     image: defaultImage,
     gallery: images.length > 1 ? images.slice(1) : undefined,
-    description: stripHtml(wp.short_description) || stripHtml(wp.description) || 'Premium tech device verified by iRepair UK technicians.',
+    description: stripHtml(wp.short_description) || stripHtml(wp.description) || 'Premium device verified by iRepair UK technicians.',
     specifications: specs,
-    warrantyMonths: 12,
+    warrantyMonths: warrantyText.includes('6') ? 6 : 12,
     permalink: wp.permalink,
     variants: storageVariants.length > 0 || colorVariants.length > 0 ? {
       storage: storageVariants.length > 0 ? storageVariants : undefined,

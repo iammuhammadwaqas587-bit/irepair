@@ -33,8 +33,8 @@ export const WordPressSyncModal: React.FC = () => {
   } = useApp();
 
   const [baseUrl, setBaseUrl] = useState(wpConfig.baseUrl || 'https://irepair-mobiles.co.uk');
-  const [consumerKey, setConsumerKey] = useState(wpConfig.consumerKey || '');
-  const [consumerSecret, setConsumerSecret] = useState(wpConfig.consumerSecret || '');
+  const [consumerKey, setConsumerKey] = useState(wpConfig.consumerKey || 'ck_ecb1d1380225b6f4775c5e0e8222f77178abe71d');
+  const [consumerSecret, setConsumerSecret] = useState(wpConfig.consumerSecret || 'cs_7dd127f2db5a2a215dd024fe3f9b618b9e5e3e2b');
   const [useProxy, setUseProxy] = useState(wpConfig.useProxy || false);
 
   const [activeTab, setActiveTab] = useState<'config' | 'guide' | 'yoast-preview'>('config');
